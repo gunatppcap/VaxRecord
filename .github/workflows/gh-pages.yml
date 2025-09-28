@@ -6,16 +6,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,33 +49,22 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: ${{ steps.base.outputs.base_path }}
         run: npm run build:export
 
-      - name: Prepare static artifacts for Pages
+      - name: Prepare static artifacts
         working-directory: action/maskedvaccine-frontend
         run: |
-          # Ensure out/ exists; Next.js output:export emits to out/
           test -d out
-          # GitHub Pages: disable Jekyll
           touch out/.nojekyll
-          # Provide 404.html for client-side routing fallbacks
           if [ -f out/_not-found/index.html ]; then
             cp out/_not-found/index.html out/404.html
           fi
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages with explicit author
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: action/maskedvaccine-frontend/out
-
-  deploy:
-    needs: build
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: action/maskedvaccine-frontend/out
+          user_name: gunatppcap
+          user_email: gunatpp1993@gmail.com
+          commit_message: deploy: ${{ github.sha }}
+          force_orphan: true
