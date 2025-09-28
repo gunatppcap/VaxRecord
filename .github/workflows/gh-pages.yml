@@ -6,18 +6,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,7 +51,7 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: ${{ steps.base.outputs.base_path }}
         run: npm run build:export
 
-      - name: Prepare static artifacts
+      - name: Prepare static artifacts for Pages
         working-directory: action/maskedvaccine-frontend
         run: |
           test -d out
@@ -61,14 +60,21 @@ jobs:
             cp out/_not-found/index.html out/404.html
           fi
 
-      - name: Deploy to gh-pages with explicit author
-        id: deploy
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: action/maskedvaccine-frontend/out
-          user_name: gunatppcap
-          user_email: gunatpp1993@gmail.com
-          commit_message: 'deploy: ${{ github.sha }}'
-          force_orphan: true
+          path: action/maskedvaccine-frontend/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
