@@ -66,5 +66,5 @@ jobs:
           publish_dir: action/maskedvaccine-frontend/out
           user_name: gunatppcap
           user_email: gunatpp1993@gmail.com
-          commit_message: deploy: ${{ github.sha }}
+          commit_message: 'deploy: ${{ github.sha }}'
           force_orphan: true
