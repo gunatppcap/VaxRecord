@@ -1,0 +1,83 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            action/maskedvaccine-frontend/package-lock.json
+            action/maskedvaccine-hardhat/package-lock.json
+
+      - name: Determine base path for GitHub Pages
+        id: base
+        run: |
+          REPO=${GITHUB_REPOSITORY#*/}
+          OWNER=${GITHUB_REPOSITORY%/*}
+          if [ "$REPO" = "${OWNER}.github.io" ]; then
+            echo "base_path=" >> $GITHUB_OUTPUT
+          else
+            echo "base_path=/${REPO}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        working-directory: action/maskedvaccine-frontend
+        run: npm ci
+
+      - name: Build with derived base path (Next output:export)
+        working-directory: action/maskedvaccine-frontend
+        env:
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.base.outputs.base_path }}
+        run: npm run build:export
+
+      - name: Prepare static artifacts for Pages
+        working-directory: action/maskedvaccine-frontend
+        run: |
+          # Ensure out/ exists; Next.js output:export emits to out/
+          test -d out
+          # GitHub Pages: disable Jekyll
+          touch out/.nojekyll
+          # Provide 404.html for client-side routing fallbacks
+          if [ -f out/_not-found/index.html ]; then
+            cp out/_not-found/index.html out/404.html
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: action/maskedvaccine-frontend/out
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
